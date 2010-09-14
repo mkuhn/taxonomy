@@ -25,7 +25,7 @@ class TestDownload(unittest.TestCase):
 
     def test01(self):
         zfile = os.path.join(outputdir, 'taxdmp.zip')
-        os.remove(zfile)
+        # os.remove(zfile)
 
         archive = Taxonomy.ncbi.fetch_data(dest_dir=outputdir)
         self.assertTrue(os.path.isfile(archive))
@@ -40,7 +40,7 @@ class TestCreateSchema(unittest.TestCase):
         self.funcname = '_'.join(self.id().split('.')[-2:])
         self.dbname = os.path.join(outputdir, self.funcname + '.db')
         log.info(self.dbname)
-        
+
     def test01(self):
         con = Taxonomy.ncbi.db_connect(self.dbname, new=True)
 

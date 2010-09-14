@@ -11,9 +11,10 @@ class Taxonomy(object):
 
     def __init__(self, engine, ranks, undefined_rank='no_rank', undef_prefix='below'):
         """
-        Taxonomy class.
+        The Taxonomy class defines an object providing an interface to
+        the taxonomy database.
 
-        * engine - sqlalchemy engine instance providing a connecgtion to a
+        * engine - sqlalchemy engine instance providing a connection to a
           database defining the taxonomy
         * ranks - list of rank names, root first
         * undefined_rank - label identifying a taxon without
@@ -29,12 +30,12 @@ class Taxonomy(object):
 
         # TODO: should ranks be defined in a table in the database?
         # TODO: assertions to check for database components
-        
+
         # see http://www.sqlalchemy.org/docs/reference/sqlalchemy/inspector.html
         # http://www.sqlalchemy.org/docs/metadata.html#metadata-reflection
 
         log.debug('using database %s' % engine.url)
-        
+
         self.engine = engine
         self.meta = MetaData()
         self.meta.bind = self.engine
@@ -88,7 +89,7 @@ class Taxonomy(object):
             raise KeyError('value "%s" not found in names.tax_id' % tax_id)
         else:
             return output[0]
-                    
+
     def _get_lineage(self, tax_id):
         undefined = self.undefined_rank
         lineage = self.taxa.get(tax_id)
@@ -108,8 +109,8 @@ class Taxonomy(object):
                 # only if we haven't reached the root
                 parent_lineage = self._get_lineage(parent)
                 lineage.update(parent_lineage)
-                
-            lineage['rank'] = rank 
+
+            lineage['rank'] = rank
             self.taxa[tax_id] = lineage
 
         return lineage
@@ -125,23 +126,31 @@ class Taxonomy(object):
         lineage['tax_name'] = self.primary_name(tax_id)
 
         return lineage
-        
-    def has_lineage(self, tax_id):
-        return tax_id in self.taxa
 
-    def write_table(self, csvfile=None):
+    def write_table(self, csvfile=None, full=True):
+        """
+        Represent the currently defined taxonomic lineages as a rectangular
+        array with columns named "tax_id","rank","tax_name", followed
+        by a column for each rank proceeding from the root to the more
+        specific ranks.
+
+         * csvfile - an open file-like object (see "csvfile" argument to csv.writer)
+         * full - if True (the default), includes a column for each rank in self.ranks;
+           otherwise, omits ranks (columns) the are undefined for all taxa.
+        """
+
         
-        fields = ['tax_id','rank','tax_name'] + self.ranks        
+        fields = ['tax_id','rank','tax_name'] + self.ranks
         writer = csv.DictWriter(csvfile, fieldnames=fields,
                                 extrasaction='ignore', quoting=csv.QUOTE_NONNUMERIC)
 
         # header row
         writer.writerow(dict(zip(fields, fields)))
-        
+
         for tax_id in self.taxa.keys():
             lin = self.lineage(tax_id)
             lin['tax_id'] = tax_id
-            
+
             writer.writerow(lin)
 
     def add_source(self, name, description=None):
@@ -156,9 +165,9 @@ class Taxonomy(object):
         except sqlalchemy.exc.IntegrityError:
             s = select([self.source.c.id], self.source.c.name == name)
             source_id, success = s.execute().fetchone()[0], False
-            
+
         return source_id, success
-        
+
     def add_node(self, tax_id, parent_id, rank, tax_name, source_id=None, source_name=None):
 
         if not (source_id or source_name):
@@ -166,7 +175,7 @@ class Taxonomy(object):
 
         if not source_id:
             source_id, source_is_new = self.add_source(name=source_name)
-        
+
         result = self.nodes.insert().execute(tax_id = tax_id,
                                              parent_id = parent_id,
                                              rank = rank,
@@ -175,9 +184,9 @@ class Taxonomy(object):
         result = self.names.insert().execute(tax_id = tax_id,
                                              tax_name = tax_name,
                                              is_primary = 1)
-                
+
         lineage = self.lineage(tax_id)
-        
+
         log.debug(lineage)
         return lineage
-        
+

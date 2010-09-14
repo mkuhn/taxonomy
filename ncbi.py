@@ -60,9 +60,7 @@ CREATE INDEX names_tax_id ON names(tax_id);
 """
 
 # define headers in names.dmp, etc (may not correspond to table columns above)
-
 merged_keys = 'old_tax_id new_tax_id'.split()
-# source_keys = 'id name description'.split()
 
 undefined_rank = 'no_rank'
 root_name = 'root'
@@ -162,9 +160,7 @@ def do_insert(con, tablename, rows, maxrows=None):
     cur.executemany(cmd, rows)
     con.commit()
 
-def fetch_data(dest_dir='.',
-               new=False,
-               url=ncbi_data_url):
+def fetch_data(dest_dir='.', new=False, url=ncbi_data_url):
 
     """
     Download data from NCBI required to generate local
