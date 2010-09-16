@@ -68,7 +68,7 @@ class TestGetLineagePrivate(unittest.TestCase):
         self.assertTrue(tax_id in self.tax.cached)
         self.assertTrue(lineage[0][0] == 'root')
         self.assertTrue(lineage[-1][0] == 'species')
-        
+
 class TestGetLineagePublic(unittest.TestCase):
 
     def setUp(self):
@@ -111,7 +111,9 @@ class TestTaxTable(unittest.TestCase):
         self.funcname = '_'.join(self.id().split('.')[-2:])
         self.engine = create_engine('sqlite:///%s' % dbname, echo=echo)
         self.tax = Taxonomy.Taxonomy(self.engine, Taxonomy.ncbi.ranks)
-
+        self.fname = os.path.join(outputdir, self.funcname)+'.csv'
+        log.info('writing to ' + self.fname)
+        
     def tearDown(self):
         self.engine.dispose()
 
@@ -119,10 +121,17 @@ class TestTaxTable(unittest.TestCase):
         tax_id = '1280' # staph aureus
         lineage = self.tax.lineage(tax_id)
 
-        fname = os.path.join(outputdir, self.funcname)+'.csv'
-        with open(fname,'w') as fout:
+        with open(self.fname,'w') as fout:
             self.tax.write_table(taxa=None, csvfile=fout)
 
+    def test03(self):
+        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa 
+        lineage = self.tax.lineage(tax_id)
+
+        with open(self.fname,'w') as fout:
+            self.tax.write_table(taxa=None, csvfile=fout)
+
+            
 class TestMethods(unittest.TestCase):
 
     def setUp(self):

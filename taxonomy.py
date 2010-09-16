@@ -1,6 +1,7 @@
 import logging
 import csv
 import itertools
+import pprint
 
 log = logging
 
@@ -55,7 +56,7 @@ class Taxonomy(object):
 
         # keys: tax_id
         # vals: lineage represented as a dict of {rank:tax_id}
-        self.taxa = {}
+        # self.taxa = {}
         
         self.undefined_rank = undefined_rank
         self.undef_prefix = undef_prefix
@@ -100,27 +101,14 @@ class Taxonomy(object):
         else:
             return output[0]
 
-    def _rename_undefined(self, lineage):
-
-        undefined = self.undefined_rank        
-
-        d = {}
-        parent_rank, parent_id = None, None
-        for rank, tax_id in lineage:
-            if rank == undefined:
-                rank = self.undef_prefix+'_'+parent_rank
-                self._add_rank(rank, parent_rank)
-            d[rank] = tax_id
-            parent_rank, parent_id = rank, tax_id
-
-        return d
-
-            
     def _get_lineage(self, tax_id):
         """
         Returns cached lineage from self.cached or recursively builds
         lineage of tax_id until the root node is reached.
         """
+
+        undefined = self.undefined_rank
+        prefix = self.undef_prefix+'_'
         
         lineage = self.cached.get(tax_id)
 
@@ -133,31 +121,39 @@ class Taxonomy(object):
             if parent_id != tax_id:
                 lineage = self._get_lineage(parent_id) + lineage
 
+            # now that we've reached the root, rename any undefined ranks
+            _parent_rank, _parent_id = None, None
+            for i, node in enumerate(lineage):                
+                _rank, _tax_id = node
+
+                if _rank == undefined:
+                    _rank = prefix + _parent_rank
+                    self._add_rank(_rank, _parent_rank)
+
+                    lineage[i] = (_rank, _tax_id)
+                    self.cached[_tax_id] = lineage
+                    log.debug('renamed undefined rank to %(_rank)s in element %(i)s of lineage of %(tax_id)s' \
+                                  % locals())
+                    
+                _parent_rank, _parent_id = _rank, _tax_id
+                
             self.cached[tax_id] = lineage
-
+            
         return lineage
-
-    def lineage(self, tax_id, cache_parents=True):
+    
+    def lineage(self, tax_id):
         """
         Public method for returning a lineage; includes tax_name and rank
 
         TODO: should handle merged tax_ids
         """
+        
+        ldict = dict(self._get_lineage(tax_id))
 
-        # check the cache of lineages before calculating
-        ldict = self.taxa.get(tax_id)
-        if not ldict:        
-            lineage = self._get_lineage(tax_id)
-            ldict = self._rename_undefined(lineage)
-
-            ldict['tax_id'] = tax_id
-            ldict['parent_id'], ldict['rank'] = self._node(tax_id)
-            ldict['tax_name'] = self.primary_name(tax_id)
-            self.taxa[tax_id] = ldict
-
-            # cache parents
-            if cache_parents:
-                [self.lineage(tid, cache_parents=False) for rank, tid in self.cached[tax_id]]
+        ldict['tax_id'] = tax_id
+        ldict['parent_id'], _ = self._node(tax_id)
+        ldict['rank'] = self.cached[tax_id][-1][0]
+        ldict['tax_name'] = self.primary_name(tax_id)
                                 
         return ldict
 
@@ -182,13 +178,13 @@ class Taxonomy(object):
         if full:
             ranks = self.ranks
         else:
-            represented = set(itertools.chain.from_iterable(
-                    lineage.keys() for lineage in self.taxa.values() 
-                    ))
-            
             # represented = set(itertools.chain.from_iterable(
-            #         [[node[0] for node in lineage] for lineage in self.cached.values()])
-            #)
+            #         lineage.keys() for lineage in self.taxa.values() 
+            #         ))
+            
+            represented = set(itertools.chain.from_iterable(
+                    [[node[0] for node in lineage] for lineage in self.cached.values()])
+            )
             ranks = [r for r in self.ranks if r in represented]
             
         fields = ['tax_id','parent_id','rank','tax_name'] + ranks
@@ -197,12 +193,10 @@ class Taxonomy(object):
         
         # header row
         writer.writerow(dict(zip(fields, fields)))
-              
-        for tax_id in taxa:
-            lin = self.lineage(tax_id)
-            # lin['tax_id'] = tax_id
-
-            writer.writerow(lin)
+        lineages = [self.lineage(tax_id) for tax_id in taxa]
+        
+        for lin in sorted(lineages, key=lambda x: (ranks.index(x['rank']), x['tax_name'])):
+             writer.writerow(lin)
 
     def add_source(self, name, description=None):
         """
