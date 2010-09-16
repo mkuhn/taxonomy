@@ -183,7 +183,7 @@ def fetch_data(dest_dir='.', new=False, url=ncbi_data_url):
     fout = os.path.join(dest_dir, os.path.split(url)[-1])
 
     if os.access(fout, os.F_OK) and not new:
-        log.info('%s exists; not downloading' % fout)
+        log.warning('%s exists; not downloading' % fout)
     else:
         # get the file
         log.warning('downloading %(url)s to %(fout)s' % locals())

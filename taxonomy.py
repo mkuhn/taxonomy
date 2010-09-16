@@ -1,5 +1,6 @@
 import logging
 import csv
+import itertools
 
 log = logging
 
@@ -49,16 +50,25 @@ class Taxonomy(object):
         self.rankset = set(self.ranks)
 
         # keys: tax_id
+        # vals: lineage represented as a list of tuples: (rank, tax_id)
+        self.cached = {}
+
+        # keys: tax_id
         # vals: lineage represented as a dict of {rank:tax_id}
         self.taxa = {}
-
+        
         self.undefined_rank = undefined_rank
         self.undef_prefix = undef_prefix
 
     def _add_rank(self, rank, parent_rank):
+        """
+        inserts rank into self.ranks.
+        """
+        
         if rank not in self.rankset:
             self.ranks.insert(self.ranks.index(parent_rank) + 1, rank)
-
+        self.rankset = set(self.ranks)
+            
     def _node(self, tax_id):
         """
         Returns parent, rank
@@ -90,66 +100,107 @@ class Taxonomy(object):
         else:
             return output[0]
 
+    def _rename_undefined(self, lineage):
+
+        undefined = self.undefined_rank        
+
+        d = {}
+        parent_rank, parent_id = None, None
+        for rank, tax_id in lineage:
+            if rank == undefined:
+                rank = self.undef_prefix+'_'+parent_rank
+                self._add_rank(rank, parent_rank)
+            d[rank] = tax_id
+            parent_rank, parent_id = rank, tax_id
+
+        return d
+
+            
     def _get_lineage(self, tax_id):
-        undefined = self.undefined_rank
-        lineage = self.taxa.get(tax_id)
+        """
+        Returns cached lineage from self.cached or recursively builds
+        lineage of tax_id until the root node is reached.
+        """
+        
+        lineage = self.cached.get(tax_id)
 
         if not lineage:
             log.debug('reconstructing lineage of tax_id "%s"' % tax_id)
-            parent, rank = self._node(tax_id)
+            parent_id, rank = self._node(tax_id)
+            lineage = [(rank, tax_id)]
+            
+            # recursively add parent_ids until we reach the root
+            if parent_id != tax_id:
+                lineage = self._get_lineage(parent_id) + lineage
 
-            # rename undefined ranks
-            if rank == undefined:
-                parent_id, parent_rank = self._node(parent)
-                rank = self.undef_prefix+'_'+parent_rank
-                self._add_rank(rank, parent_rank)
-
-            lineage = {rank:tax_id}
-            if parent != tax_id:
-                # only if we haven't reached the root
-                parent_lineage = self._get_lineage(parent)
-                lineage.update(parent_lineage)
-
-            lineage['rank'] = rank
-            self.taxa[tax_id] = lineage
+            self.cached[tax_id] = lineage
 
         return lineage
 
-    def lineage(self, tax_id):
+    def lineage(self, tax_id, cache_parents=True):
         """
         Public method for returning a lineage; includes tax_name and rank
 
         TODO: should handle merged tax_ids
         """
 
-        lineage = self._get_lineage(tax_id).copy()
-        lineage['tax_name'] = self.primary_name(tax_id)
+        # check the cache of lineages before calculating
+        ldict = self.taxa.get(tax_id)
+        if not ldict:        
+            lineage = self._get_lineage(tax_id)
+            ldict = self._rename_undefined(lineage)
 
-        return lineage
+            ldict['tax_id'] = tax_id
+            ldict['parent_id'], ldict['rank'] = self._node(tax_id)
+            ldict['tax_name'] = self.primary_name(tax_id)
+            self.taxa[tax_id] = ldict
 
-    def write_table(self, csvfile=None, full=True):
+            # cache parents
+            if cache_parents:
+                [self.lineage(tid, cache_parents=False) for rank, tid in self.cached[tax_id]]
+                                
+        return ldict
+
+    def write_table(self, taxa=None, csvfile=None, full=False):
         """
         Represent the currently defined taxonomic lineages as a rectangular
         array with columns named "tax_id","rank","tax_name", followed
         by a column for each rank proceeding from the root to the more
         specific ranks.
 
+         * taxa - list of taxids to include in the output; if none are
+           provided, use self.cached.keys() (ie, those taxa loaded into the cache).
          * csvfile - an open file-like object (see "csvfile" argument to csv.writer)
          * full - if True (the default), includes a column for each rank in self.ranks;
            otherwise, omits ranks (columns) the are undefined for all taxa.
         """
 
-        
-        fields = ['tax_id','rank','tax_name'] + self.ranks
+        if not taxa:
+            taxa = self.cached.keys()
+
+        # which ranks are actually represented?
+        if full:
+            ranks = self.ranks
+        else:
+            represented = set(itertools.chain.from_iterable(
+                    lineage.keys() for lineage in self.taxa.values() 
+                    ))
+            
+            # represented = set(itertools.chain.from_iterable(
+            #         [[node[0] for node in lineage] for lineage in self.cached.values()])
+            #)
+            ranks = [r for r in self.ranks if r in represented]
+            
+        fields = ['tax_id','parent_id','rank','tax_name'] + ranks
         writer = csv.DictWriter(csvfile, fieldnames=fields,
                                 extrasaction='ignore', quoting=csv.QUOTE_NONNUMERIC)
-
+        
         # header row
         writer.writerow(dict(zip(fields, fields)))
-
-        for tax_id in self.taxa.keys():
+              
+        for tax_id in taxa:
             lin = self.lineage(tax_id)
-            lin['tax_id'] = tax_id
+            # lin['tax_id'] = tax_id
 
             writer.writerow(lin)
 
@@ -168,7 +219,7 @@ class Taxonomy(object):
 
         return source_id, success
 
-    def add_node(self, tax_id, parent_id, rank, tax_name, source_id=None, source_name=None):
+    def add_node(self, tax_id, parent_id, rank, tax_name, source_id=None, source_name=None, **kwargs):
 
         if not (source_id or source_name):
             raise ValueError('Taxonomy.add_node requires source_id or source_name')

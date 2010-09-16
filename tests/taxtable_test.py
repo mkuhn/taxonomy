@@ -25,7 +25,7 @@ dbname = os.path.join(outputdir, 'ncbi_taxonomy.db')
 echo = False
 
 zfile = Taxonomy.ncbi.fetch_data(dest_dir=outputdir, new=False)
-if True:
+if False:
     con = Taxonomy.ncbi.db_connect(dbname, new=True)
     Taxonomy.ncbi.db_load(con, zfile)
     con.close()
@@ -58,15 +58,17 @@ class TestGetLineagePrivate(unittest.TestCase):
 
     def test01(self):
         lineage = self.tax._get_lineage('1')
-        self.assertTrue(lineage['root'] == '1')
+        self.assertTrue(lineage == [('root','1')])
 
     def test02(self):
         tax_id = '1280' # staph aureus
 
-        self.assertFalse(tax_id in self.tax.taxa)
+        self.assertFalse(tax_id in self.tax.cached)
         lineage = self.tax._get_lineage(tax_id)
-        self.assertTrue(tax_id in self.tax.taxa)
-
+        self.assertTrue(tax_id in self.tax.cached)
+        self.assertTrue(lineage[0][0] == 'root')
+        self.assertTrue(lineage[-1][0] == 'species')
+        
 class TestGetLineagePublic(unittest.TestCase):
 
     def setUp(self):
@@ -85,11 +87,24 @@ class TestGetLineagePublic(unittest.TestCase):
     def test02(self):
         tax_id = '1280' # staph aureus
 
-        self.assertFalse(tax_id in self.tax.taxa)
+        self.assertFalse(tax_id in self.tax.cached)
         lineage = self.tax.lineage(tax_id)
-        self.assertTrue(tax_id in self.tax.taxa)
+        self.assertTrue(tax_id in self.tax.cached)
         self.assertTrue(lineage['rank'] == 'species')
 
+        keys = set(lineage.keys())
+        ranks = set(self.tax.ranks)
+        self.assertTrue(keys - ranks == set(['parent_id', 'tax_id', 'rank', 'tax_name']))
+        
+    def test03(self):
+        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa 
+        lineage = self.tax.lineage(tax_id)
+        self.assertTrue(lineage['rank'] == 'genus')
+
+        keys = set(lineage.keys())
+        ranks = set(self.tax.ranks)
+        self.assertTrue(keys - ranks == set(['parent_id', 'tax_id', 'rank', 'tax_name']))
+        
 class TestTaxTable(unittest.TestCase):
 
     def setUp(self):
@@ -102,11 +117,11 @@ class TestTaxTable(unittest.TestCase):
 
     def test02(self):
         tax_id = '1280' # staph aureus
-        lineage = self.tax._get_lineage(tax_id)
+        lineage = self.tax.lineage(tax_id)
 
         fname = os.path.join(outputdir, self.funcname)+'.csv'
         with open(fname,'w') as fout:
-            self.tax.write_table(fout)
+            self.tax.write_table(taxa=None, csvfile=fout)
 
 class TestMethods(unittest.TestCase):
 
@@ -127,16 +142,14 @@ class TestMethods(unittest.TestCase):
 
     def test03(self):
         res = self.tax.add_source(name='new source', description='really new!')
-        self.assertTrue(res == (2, True))
         res = self.tax.add_source(name='new source', description='really new!')
         self.assertTrue(res == (2, False))
 
 
-    def test04(self):
-
-        self.tax.add_node(tax_id = "186802_1",
-                          parent_id = "186802",
-                          rank = "species",
-                          source_name = "Fredricks Lab",
-                          tax_name = 'BVAB1')
+    # def test04(self):
+    #     self.tax.add_node(tax_id = "186802_1",
+    #                       parent_id = "186802",
+    #                       rank = "species",
+    #                       source_name = "Fredricks Lab",
+    #                       tax_name = 'BVAB1')
 
