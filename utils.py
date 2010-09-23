@@ -6,7 +6,7 @@ except ImportError:
     xlrd = None
 
 if xlrd:    
-    def cellval(cell_obj, datemode):
+    def _cellval(cell_obj, datemode):
         if cell_obj.ctype == xlrd.XL_CELL_DATE:
             timetup = xlrd.xldate_as_tuple(cell_obj.value, datemode)
             val = datetime.datetime(*timetup)
@@ -19,15 +19,21 @@ if xlrd:
         return val
 
     def read_spreadsheet(filename, fmts=None):
+        """
+        Read excel spreadsheet, performing type coersion as specified in
+        fmts (dict keyed by column name returning either a formatting
+        string or a function such as str, int, float, etc).
+        """
 
         w = xlrd.open_workbook(filename)
         datemode = w.datemode
         s = w.sheet_by_index(0)
-        rows = ([cellval(c, datemode) for c in s.row(i)] for i in xrange(s.nrows))
+        rows = ([_cellval(c, datemode) for c in s.row(i)] for i in xrange(s.nrows))
 
         firstrow = rows.next()
-        headers = [str('_'.join(x.lower().split())) for x in firstrow]
-        
+        headers = [str('_'.join(x.split())) for x in firstrow]
+
+        lines = []
         for row in rows:
             # valid rows have at least one value
             if not any([bool(cell) for cell in row]):
@@ -35,15 +41,21 @@ if xlrd:
 
             d = dict(zip(headers, row))
 
-            # represent tax_id and group_id as string or None
             if fmts:
                 for colname in fmts.keys():
+                    if hasattr(fmts[colname], '__call__'):
+                        formatter = fmts[colname]
+                    else:
+                        formatter = lambda val: fmts[colname] % val
+
                     try:
-                        d[colname] = fmts[colname] % d[colname]
-                    except TypeError:
+                        d[colname] = formatter(d[colname])
+                    except (TypeError, ValueError, AttributeError), msg:
                         pass
-                        
-            yield d
+
+            lines.append(d)
+
+        return headers, lines
 
 def get_new_nodes(fname):
     if fname.endswith('.xls') and xlrd:
