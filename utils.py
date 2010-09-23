@@ -1,3 +1,5 @@
+import datetime
+
 try:
     # download: http://pypi.python.org/pypi/xlrd
     # docs: http://www.lexicon.net/sjmachin/xlrd.html
@@ -5,7 +7,7 @@ try:
 except ImportError:
     xlrd = None
 
-if xlrd:    
+if xlrd:
     def _cellval(cell_obj, datemode):
         if cell_obj.ctype == xlrd.XL_CELL_DATE:
             timetup = xlrd.xldate_as_tuple(cell_obj.value, datemode)
@@ -67,4 +69,4 @@ def get_new_nodes(fname):
         raise ValueError('Error: %s must be in .csv or .xls format')
 
     return rows
-    
+
