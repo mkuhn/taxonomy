@@ -55,6 +55,8 @@ CREATE INDEX nodes_tax_id ON nodes(tax_id);
 
 -- indices on names
 CREATE INDEX names_tax_id ON names(tax_id);
+CREATE INDEX names_tax_name ON names(tax_name);
+CREATE INDEX names_is_primary ON names(is_primary);
 -- CREATE UNIQUE INDEX names_id_name ON names(tax_id, tax_name, is_primary);
 
 """

@@ -28,12 +28,13 @@ class TestReadSpreadsheet(unittest.TestCase):
         pass
 
     def test01(self):
-        rows = Taxonomy.utils.read_spreadsheet(os.path.join(datadir,'new_taxa.xls'))
+        headers, rows = Taxonomy.utils.read_spreadsheet(
+            os.path.join(datadir,'new_taxa.xls'))
         check = lambda val: isinstance(val, float)
         self.assertTrue(all([check(row['parent_id']) for row in rows]))
 
     def test02(self):
-        rows = Taxonomy.utils.read_spreadsheet(
+        headers, rows = Taxonomy.utils.read_spreadsheet(
             os.path.join(datadir,'new_taxa.xls'),
             fmts={'tax_id':'%i','parent_id':'%i'}
             )

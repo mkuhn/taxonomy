@@ -86,7 +86,7 @@ class Taxonomy(object):
         # parent_id, rank
         return output
 
-    def primary_name(self, tax_id):
+    def primary_from_id(self, tax_id):
         """
         Returns primary taxonomic name associated with tax_id
         """
@@ -101,6 +101,29 @@ class Taxonomy(object):
         else:
             return output[0]
 
+    def primary_from_name(self, tax_name):
+        """
+        Return tax_id and primary tax_name corresponding to tax_name.
+        """
+        
+        names = self.names
+
+        s1 = select([names.c.tax_id, names.c.is_primary], names.c.tax_name == tax_name)
+            
+        res = s1.execute().fetchone()
+        if res:        
+            tax_id, is_primary = res
+        else:
+            raise KeyError('"%s" not found in names.tax_names' % tax_name)
+        
+        if not is_primary:
+            s2 = select([names.c.tax_name],
+                        and_(names.c.tax_id == tax_id, names.c.is_primary == 1))
+            tax_name = s2.execute().fetchone()[0]
+
+        return tax_id, tax_name, bool(is_primary)
+            
+        
     def _get_lineage(self, tax_id):
         """
         Returns cached lineage from self.cached or recursively builds
@@ -140,20 +163,51 @@ class Taxonomy(object):
             self.cached[tax_id] = lineage
             
         return lineage
+
+    def synonyms(self, tax_id=None, tax_name=None):
+        if not bool(tax_id) ^ bool(tax_name):
+            raise ValueError('Exactly one of tax_id and tax_name may be provided.')
+
+        names = self.names
+
+        if tax_name:
+            s1 = select([names.c.tax_id], names.c.tax_name == tax_name)
+            res = s1.execute().fetchone()
+
+            if res:        
+                tax_id = res[0]
+            else:
+                raise KeyError('"%s" not found in names.tax_names' % tax_name)
+        
+        s = select([names.c.tax_name, names.c.is_primary],
+                   names.c.tax_id == tax_id)
+        output = s.execute().fetchall()
+        
+        if not output:
+            raise KeyError('"%s" not found in names.tax_id' % tax_id)
+
+        return output
+        
     
-    def lineage(self, tax_id):
+    def lineage(self, tax_id=None, tax_name=None):
         """
         Public method for returning a lineage; includes tax_name and rank
 
         TODO: should handle merged tax_ids
         """
-        
+
+        if not bool(tax_id) ^ bool(tax_name):
+            raise ValueError('Exactly one of tax_id and tax_name may be provided.')
+
+        if tax_name:
+            tax_id, primary_name, is_primary = self.primary_from_name(tax_name)
+
         ldict = dict(self._get_lineage(tax_id))
 
         ldict['tax_id'] = tax_id
         ldict['parent_id'], _ = self._node(tax_id)
         ldict['rank'] = self.cached[tax_id][-1][0]
-        ldict['tax_name'] = self.primary_name(tax_id)
+        ldict['tax_name'] = self.primary_from_id(tax_id)
                                 
         return ldict
 
@@ -177,11 +231,7 @@ class Taxonomy(object):
         # which ranks are actually represented?
         if full:
             ranks = self.ranks
-        else:
-            # represented = set(itertools.chain.from_iterable(
-            #         lineage.keys() for lineage in self.taxa.values() 
-            #         ))
-            
+        else:            
             represented = set(itertools.chain.from_iterable(
                     [[node[0] for node in lineage] for lineage in self.cached.values()])
             )

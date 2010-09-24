@@ -95,7 +95,7 @@ def main():
         files if provided). [default %default]
         """))
 
-    parser.add_option("-n", "--new-nodes", dest="new_nodes", help=xws("""
+    parser.add_option("-a", "--add-new-nodes", dest="new_nodes", help=xws("""
         An optional Excel (.xls) spreadsheet (requires xlrd) or
         csv-format file defining nodes to add to the
         taxonomy. Mandatory fields include
@@ -107,10 +107,16 @@ def main():
         Names the source for new nodes. [default %default]
     """))
     
-    parser.add_option("-t", "--taxa", dest="taxa", help=xws("""
+    parser.add_option("-t", "--tax-ids", dest="taxids", help=xws("""
         A comma delimited list of tax_ids or the name of a file
         specifying tax_ids (whitespace-delimited; lines beginning with
         "#" are ignored). 
+    """))
+
+    parser.add_option("-n", "--tax-names", dest="taxnames", help=xws("""
+        An optional file containing a list of taxonomic names to
+        match against primary names and synonyms as a source
+        of tax_ids. Lines beginning with # are ignored.
     """))
     
     parser.add_option("-v", "--verbose",

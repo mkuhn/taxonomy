@@ -61,7 +61,11 @@ if xlrd:
 
 def get_new_nodes(fname):
     if fname.endswith('.xls') and xlrd:
-        rows = read_spreadsheet(fname, fmts={'tax_id':'%i','parent_id':'%i'})
+        headers, rows = read_spreadsheet(
+            fname,
+            fmts={'tax_id':'%i',
+                  'parent_id':'%i'
+                  })
     elif fname.endswith('.csv'):
         reader = csv.DictReader(fname)
         rows = (d for d in reader if d['tax_id'])
