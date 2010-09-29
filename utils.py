@@ -1,4 +1,7 @@
 import datetime
+import logging
+
+log = logging
 
 try:
     # download: http://pypi.python.org/pypi/xlrd
@@ -73,4 +76,5 @@ def get_new_nodes(fname):
         raise ValueError('Error: %s must be in .csv or .xls format')
 
     return rows
+
 

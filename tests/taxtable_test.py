@@ -21,11 +21,12 @@ module_name = os.path.split(sys.argv[0])[1].rstrip('.py')
 outputdir = os.path.abspath(config.outputdir)
 datadir = os.path.abspath(config.datadir)
 
-dbname = os.path.join(outputdir, 'ncbi_taxonomy.db')
+dbname = os.path.join(outputdir, 'taxtable_test.db')
 echo = False
 
-zfile = Taxonomy.ncbi.fetch_data(dest_dir=outputdir, new=False)
-if False:
+startover = False
+zfile = Taxonomy.ncbi.fetch_data(dest_dir=outputdir, new=startover)
+if startover or not os.path.isfile(dbname):
     con = Taxonomy.ncbi.db_connect(dbname, new=True)
     Taxonomy.ncbi.db_load(con, zfile)
     con.close()
@@ -93,7 +94,7 @@ class TestTaxNameSearch(unittest.TestCase):
 
         self.assertTrue(tax_id == '1378')
         self.assertFalse(is_primary)
-        
+
 
 class TestSynonyms(unittest.TestCase):
 
@@ -111,8 +112,8 @@ class TestSynonyms(unittest.TestCase):
     def test02(self):
         synonyms = self.tax.synonyms(tax_name='Gemella')
 
-        
-        
+
+
 class TestGetLineagePublic(unittest.TestCase):
 
     def setUp(self):
@@ -139,9 +140,9 @@ class TestGetLineagePublic(unittest.TestCase):
         keys = set(lineage.keys())
         ranks = set(self.tax.ranks)
         self.assertTrue(keys - ranks == set(['parent_id', 'tax_id', 'rank', 'tax_name']))
-        
+
     def test03(self):
-        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa 
+        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa
         lineage = self.tax.lineage(tax_id)
         self.assertTrue(lineage['rank'] == 'genus')
 
@@ -156,16 +157,16 @@ class TestGetLineagePublic(unittest.TestCase):
         self.assertRaises(ValueError, self.tax.lineage, tax_id='1', tax_name='root')
 
     def test06(self):
-        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa 
+        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa
         tax_name = 'Gemella'
         lineage = self.tax.lineage(tax_name=tax_name)
 
         # lineage = self.tax.lineage(tax_id)
         # self.assertTrue(lineage['rank'] == 'genus')
 
-        
 
-        
+
+
 class TestTaxTable(unittest.TestCase):
 
     def setUp(self):
@@ -174,7 +175,7 @@ class TestTaxTable(unittest.TestCase):
         self.tax = Taxonomy.Taxonomy(self.engine, Taxonomy.ncbi.ranks)
         self.fname = os.path.join(outputdir, self.funcname)+'.csv'
         log.info('writing to ' + self.fname)
-        
+
     def tearDown(self):
         self.engine.dispose()
 
@@ -186,14 +187,22 @@ class TestTaxTable(unittest.TestCase):
             self.tax.write_table(taxa=None, csvfile=fout)
 
     def test03(self):
-        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa 
+        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa
         lineage = self.tax.lineage(tax_id)
 
         with open(self.fname,'w') as fout:
             self.tax.write_table(taxa=None, csvfile=fout)
 
+    def test04(self):
+        tax_id = '1378' # Gemella; lineage has two successive no_rank taxa
+        for tax_id in ['1378','1280','131110']:
+            lineage = self.tax.lineage(tax_id)
+
+        with open(self.fname,'w') as fout:
+            self.tax.write_table(taxa=None, csvfile=fout)
             
-            
+
+
 class TestMethods(unittest.TestCase):
 
     def setUp(self):

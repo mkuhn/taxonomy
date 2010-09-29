@@ -15,7 +15,6 @@ import Taxonomy
 
 log = logging
 
-module_name = os.path.split(sys.argv[0])[1].rstrip('.py')
 outputdir = os.path.abspath(config.outputdir)
 datadir = os.path.abspath(config.datadir)
 
@@ -55,3 +54,29 @@ class TestGetNewNodes(unittest.TestCase):
         check = lambda val: isinstance(val, str) and '.' not in val
         self.assertTrue(all([check(row['parent_id']) for row in rows]))
 
+class TestWriteConfig(unittest.TestCase):
+    def setUp(self):
+        self.funcname = '_'.join(self.id().split('.')[-2:])
+        self.fname = os.path.join(outputdir, self.funcname) + '.ini'
+        
+    def tearDown(self):
+        pass
+
+    def test01(self):
+
+        options = {('sec1','opt1'):'val1',('sec1','opt2'):'val2',('sec2','opt3'):'val3',('sec2','opt4'):'val4'}
+        Taxonomy.package.write_config(
+            fname = self.fname,
+            optdict = options,
+            sections = dict(sec1=['opt1','opt2'], sec2=['opt3','opt4'])
+            )
+    
+    def test02(self):
+        
+        options = {('sec1','opt1'):'val1',('sec1','opt2'):'val2',('sec2','opt3'):'val3'}
+        Taxonomy.package.write_config(
+            fname = self.fname,
+            optdict = options,
+            sections = dict(sec1=['opt1','opt2'], sec2=['opt3','opt4'])
+            )
+    
