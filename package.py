@@ -7,13 +7,12 @@ import hashlib
 
 log = logging
 
-manifest_name = 'contents.txt'
+manifest_name = 'CONTENTS.txt'
 
 package_contents = {
     'metadata':['create_date','author','description'],
     'files':['tree_file','tree_stats','aln_fasta','aln_sto',
-             'infernal_profile','hmm_profile',
-             'seq_info','taxonomy'],
+             'profile', 'seq_info','taxonomy'],
     'md5':[]
     }
 

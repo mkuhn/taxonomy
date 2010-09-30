@@ -93,10 +93,10 @@ def main():
         Multiple alignment in Stockholm format.
         """), metavar='FILE')
 
-    parser.add_option("-I", "--infernal-profile",
-        action="store", dest="infernal_profile", type="string",
+    parser.add_option("-p", "--profile",
+        action="store", dest="profile", type="string",
         help=xws("""
-        Alignment profile used by Infernal.
+        Alignment profile.
         """), metavar='FILE')
 
     parser.add_option("-H", "--hmm-profile",
