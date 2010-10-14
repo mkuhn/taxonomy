@@ -12,7 +12,7 @@ manifest_name = 'CONTENTS.txt'
 package_contents = {
     'metadata':['create_date','author','description'],
     'files':['tree_file','tree_stats','aln_fasta','aln_sto',
-             'profile', 'seq_info','taxonomy'],
+             'profile', 'seq_info','taxonomy','mask'],
     'md5':[]
     }
 
