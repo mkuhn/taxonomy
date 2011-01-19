@@ -12,6 +12,8 @@ import pprint
 
 from sqlalchemy import create_engine
 
+import newick
+
 import config
 import Taxonomy
 
@@ -165,6 +167,32 @@ class TestGetLineagePublic(unittest.TestCase):
         # self.assertTrue(lineage['rank'] == 'genus')
 
 
+class TestGetTreeLineagePublic(unittest.TestCase):
+
+    def setUp(self):
+        self.funcname = '_'.join(self.id().split('.')[-2:])
+        self.engine = create_engine('sqlite:///%s' % dbname, echo=echo)
+        self.tax = Taxonomy.Taxonomy(self.engine, Taxonomy.ncbi.ranks)
+
+    def tearDown(self):
+        self.engine.dispose()
+
+    def test01(self):
+        # generate tree from base taxa
+        tax_ids = ['9606', '7227', '83333', '10090']
+        tree = self.tax.tree_lineage(tax_ids)
+
+        # go through tree and collect leaf identifiers
+        leafs = []
+        def visit_leaf(self):
+            leafs.append(self.identifier)
+        
+        tv = newick.tree.TreeVisitor()
+        tv.visit_leaf = visit_leaf
+        
+        # check if leafs are in correct order
+        tree.dfs_traverse(tv)
+        self.assertTrue( leafs == ['9606', '10090', '7227', '83333'] )
 
 
 class TestTaxTable(unittest.TestCase):
@@ -233,3 +261,5 @@ class TestMethods(unittest.TestCase):
     #                       source_name = "Fredricks Lab",
     #                       tax_name = 'BVAB1')
 
+if __name__ == '__main__':
+    unittest.main()

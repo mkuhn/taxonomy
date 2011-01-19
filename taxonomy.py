@@ -9,6 +9,9 @@ import sqlalchemy
 from sqlalchemy import MetaData, create_engine, and_
 from sqlalchemy.sql import select
 
+import newick
+
+
 class Taxonomy(object):
 
     def __init__(self, engine, ranks, undefined_rank='no_rank', undef_prefix='below'):
@@ -214,6 +217,51 @@ class Taxonomy(object):
         ldict['tax_name'] = self.primary_from_id(tax_id)
 
         return ldict
+
+    def tree_lineage(self, tax_ids=None, tax_names=None):
+        """
+        Public method for returning a lineage for multiple taxa; includes tax_name and rank
+        """
+
+        if not bool(tax_ids) ^ bool(tax_names):
+            raise ValueError('Exactly one of tax_ids and tax_names may be provided.')
+
+        if tax_names:
+            tax_ids = [ self.primary_from_name(tax_name)[0] for tax_name in tax_names  ]
+
+        trees = {}
+        root = None
+        
+        for tax_id in tax_ids:
+            assert tax_id not in trees, "No support yet for non-terminal taxa"
+            
+            subtree = newick.tree.Leaf(tax_id)
+            trees[tax_id] = subtree
+            
+            while True:
+                parent_id, rank = self._node(tax_id)
+
+                if parent_id == tax_id: 
+                    # we've reached the root
+                    assert root is None, "No support for trees with more than one root"
+                    root = tree
+                    break
+
+                if parent_id in trees:
+                    # we've reached a tree grown from another leaf, so add this tree
+                    tree = trees[parent_id]
+                    tree.add_edge( (subtree, None, None) )
+                    break
+
+                # we've not visited this parent taxon, so generate new tree
+                tree = trees[parent_id] = newick.tree.Tree()
+                tree.identifier = parent_id
+                tree.add_edge( (subtree, None, None) )
+
+                subtree = tree
+                tax_id = parent_id
+
+        return root
 
     def write_table(self, taxa=None, csvfile=None, full=False):
         """
