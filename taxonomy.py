@@ -46,6 +46,7 @@ class Taxonomy(object):
         self.meta.bind = self.engine
         self.meta.reflect()
 
+        self.merged = self.meta.tables['merged']
         self.nodes = self.meta.tables['nodes']
         self.names = self.meta.tables['names']
         self.source = self.meta.tables['source']
@@ -73,7 +74,7 @@ class Taxonomy(object):
             self.ranks.insert(self.ranks.index(parent_rank) + 1, rank)
         self.rankset = set(self.ranks)
 
-    def _node(self, tax_id):
+    def _node(self, tax_id, retry = True):
         """
         Returns parent, rank
         """
@@ -84,7 +85,21 @@ class Taxonomy(object):
         output = res.fetchone()
 
         if not output:
-            raise KeyError('value "%s" not found in nodes.tax_id' % tax_id)
+
+            if retry:
+                s = select([self.merged.c.new_tax_id],
+                           self.merged.c.old_tax_id == tax_id)
+                res = s.execute()
+                new_tax_id = res.fetchone()
+
+                if not new_tax_id:
+                    raise KeyError('value "%s" not found in nodes.tax_id' % tax_id)
+
+                return self._node(new_tax_id[0], retry = False)
+
+            else:
+                raise KeyError('value "%s" not found in nodes.tax_id' % tax_id)
+
 
         # parent_id, rank
         return output
@@ -134,7 +149,7 @@ class Taxonomy(object):
         """
 
         indent = '.'*_level
-        
+
         undefined = self.undefined_rank
         prefix = self.undef_prefix+'_'
 
@@ -199,8 +214,6 @@ class Taxonomy(object):
     def lineage(self, tax_id=None, tax_name=None):
         """
         Public method for returning a lineage; includes tax_name and rank
-
-        TODO: should handle merged tax_ids
         """
 
         if not bool(tax_id) ^ bool(tax_name):
@@ -210,7 +223,7 @@ class Taxonomy(object):
             tax_id, primary_name, is_primary = self.primary_from_name(tax_name)
 
         ldict = dict(self._get_lineage(tax_id))
-        
+
         ldict['tax_id'] = tax_id
         ldict['parent_id'], _ = self._node(tax_id)
         ldict['rank'] = self.cached[tax_id][-1][0]
@@ -231,17 +244,17 @@ class Taxonomy(object):
 
         trees = {}
         root = None
-        
+
         for tax_id in tax_ids:
             assert tax_id not in trees, "No support yet for non-terminal taxa"
-            
+
             subtree = newick.tree.Leaf(tax_id)
             trees[tax_id] = subtree
-            
+
             while True:
                 parent_id, rank = self._node(tax_id)
 
-                if parent_id == tax_id: 
+                if parent_id == tax_id:
                     # we've reached the root
                     assert root is None, "No support for trees with more than one root"
                     root = tree
