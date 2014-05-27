@@ -104,7 +104,7 @@ class Taxonomy(object):
         # parent_id, rank
         return output
 
-    def primary_from_id(self, tax_id):
+    def primary_from_id(self, tax_id, retry = True):
         """
         Returns primary taxonomic name associated with tax_id
         """
@@ -115,7 +115,20 @@ class Taxonomy(object):
         output = res.fetchone()
 
         if not output:
-            raise KeyError('value "%s" not found in names.tax_id' % tax_id)
+
+            if retry:
+                s = select([self.merged.c.new_tax_id],
+                           self.merged.c.old_tax_id == tax_id)
+                res = s.execute()
+                new_tax_id = res.fetchone()
+
+                if not new_tax_id:
+                    raise KeyError('value "%s" not found in names.tax_id' % tax_id)
+
+                return self.primary_from_id(new_tax_id[0], retry = False)
+            else:
+                raise KeyError('value "%s" not found in names.tax_id' % tax_id)
+
         else:
             return output[0]
 
@@ -246,8 +259,6 @@ class Taxonomy(object):
         root = None
 
         for tax_id in tax_ids:
-            assert tax_id not in trees, "No support yet for non-terminal taxa"
-
             subtree = newick.tree.Leaf(tax_id)
             trees[tax_id] = subtree
 
